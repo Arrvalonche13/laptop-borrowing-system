@@ -1,41 +1,51 @@
-# 📘 คู่มือการติดตั้งระบบยืมคืนคอมพิวเตอร์พกพา
+# 📘 คู่มือการติดตั้งระบบยืมคืนคอมพิวเตอร์พกพา (ฉบับสมบูรณ์)
 
-ระบบนี้พร้อม Deploy แล้ว! ใช้งานได้ฟรี 100%
+## 🎯 สิ่งที่แก้ไขแล้ว:
+
+✅ แก้ปัญหาอีเมลส่งสลับกัน  
+✅ เพิ่มปุ่มอนุมัติ/ไม่อนุมัติในอีเมล  
+✅ ส่งอีเมลแจ้งผลกลับผู้ยืมอัตโนมัติ  
+✅ ส่งสำเนาให้ผู้ดูแลระบบ (suttipong.p@psu.ac.th)  
 
 ---
 
-## 🚀 ขั้นตอนการติดตั้ง (ใช้เวลาประมาณ 15-20 นาที)
+## 🚀 ขั้นตอนการติดตั้ง
 
-### **ขั้นตอนที่ 1: สมัคร EmailJS (ฟรี)**
+### **ขั้นตอนที่ 1: สมัคร EmailJS**
 
 1. ไปที่ https://www.emailjs.com/
-2. คลิก **Sign Up** สมัครด้วย Google Account
+2. คลิก **Sign Up** (สมัครด้วย Google)
 3. ยืนยันอีเมล
 
 ---
 
 ### **ขั้นตอนที่ 2: เชื่อมต่อ Gmail**
 
-1. ใน Dashboard ของ EmailJS คลิก **Add New Service**
+1. คลิก **Add New Service**
 2. เลือก **Gmail**
-3. คลิก **Connect Account** และเลือก Gmail ที่ต้องการใช้ส่งอีเมล
-4. ตั้งชื่อ Service (เช่น "PSU Laptop System")
-5. คลิก **Create Service**
-6. **📝 จดบันทึก Service ID** (เช่น service_abc123)
+3. คลิก **Connect Account**
+4. ตั้งชื่อ Service: "PSU Laptop System"
+5. **📝 จด Service ID** (เช่น service_abc123)
 
 ---
 
-### **ขั้นตอนที่ 3: สร้าง Email Template 2 ตัว**
+### **ขั้นตอนที่ 3: สร้าง Email Template ทั้งหมด 2 ตัว**
 
-#### **Template 1: สำหรับผู้ยืม**
+#### **Template 1: สำหรับผู้ยืม (Borrower Confirmation)**
 
 1. คลิก **Email Templates** → **Create New Template**
-2. ตั้งชื่อ: "Borrower Confirmation"
+2. ตั้งชื่อ: **Borrower Confirmation**
 3. กรอกข้อมูล:
-   - **From Name**: ระบบยืมคอมพิวเตอร์ PSU
-   - **From Email**: อีเมลของคุณ
-   - **Subject**: ยืนยันการส่งคำขอยืมคอมพิวเตอร์
-   - **Content (HTML)**: คัดลอกโค้ดด้านล่างนี้
+
+```
+Subject: ✅ ยืนยันการส่งคำขอยืมคอมพิวเตอร์
+From Name: ระบบยืมคอมพิวเตอร์ PSU
+From Email: อีเมลของคุณ
+To Email: {{to_email}}   👈 สำคัญมาก!
+Reply To: {{to_email}}
+```
+
+4. **Content (HTML)**:
 
 ```html
 <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
@@ -74,18 +84,26 @@
 </div>
 ```
 
-4. คลิก **Save**
-5. **📝 จดบันทึก Template ID** (เช่น template_xyz789)
+5. คลิก **Save**
+6. **📝 จด Template ID** (เช่น template_xyz789)
 
-#### **Template 2: สำหรับผู้อนุมัติ**
+---
 
-1. สร้าง Template ใหม่อีกครั้ง
-2. ตั้งชื่อ: "Approval Request"
+#### **Template 2: สำหรับผู้อนุมัติ (Approval Request)**
+
+1. สร้าง Template ใหม่
+2. ตั้งชื่อ: **Approval Request**
 3. กรอกข้อมูล:
-   - **From Name**: ระบบยืมคอมพิวเตอร์ PSU
-   - **From Email**: อีเมลของคุณ
-   - **Subject**: 🔔 มีคำขอยืมคอมพิวเตอร์รอการอนุมัติ
-   - **Content (HTML)**: คัดลอกโค้ดด้านล่างนี้
+
+```
+Subject: 🔔 มีคำขอยืมคอมพิวเตอร์รอการอนุมัติ
+From Name: ระบบยืมคอมพิวเตอร์ PSU
+From Email: อีเมลของคุณ
+To Email: {{to_email}}   👈 สำคัญมาก!
+Reply To: {{borrower_email}}
+```
+
+4. **Content (HTML)**:
 
 ```html
 <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
@@ -117,10 +135,22 @@
             </ul>
         </div>
         
-        <div style="background: #dcfce7; padding: 20px; border-radius: 8px; text-align: center;">
-            <p style="margin: 0 0 15px 0; font-weight: bold;">กรุณาเข้าสู่ระบบเพื่ออนุมัติหรือไม่อนุมัติ</p>
-            <p style="margin: 0; font-size: 14px; color: #059669;">
-                📌 หมายเหตุ: ในการใช้งานจริง ท่านสามารถเข้าสู่ระบบเพื่อพิจารณาคำขอได้ที่เว็บไซต์
+        <div style="text-align: center; margin: 30px 0;">
+            <p style="margin-bottom: 20px; font-weight: bold; font-size: 16px;">กรุณาพิจารณาคำขอ:</p>
+            
+            <a href="{{approval_link}}" style="display: inline-block; padding: 15px 40px; background: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 10px;">
+                ✅ อนุมัติ
+            </a>
+            
+            <a href="{{rejection_link}}" style="display: inline-block; padding: 15px 40px; background: #ef4444; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 10px;">
+                ❌ ไม่อนุมัติ
+            </a>
+        </div>
+        
+        <div style="background: #e0e7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; text-align: center;">
+                💡 <strong>คำแนะนำ:</strong> คลิกปุ่มด้านบนเพื่ออนุมัติหรือไม่อนุมัติทันที<br>
+                ระบบจะแจ้งผลไปยังผู้ยืมและผู้ดูแลระบบอัตโนมัติ
             </p>
         </div>
         
@@ -134,23 +164,23 @@
 </div>
 ```
 
-4. คลิก **Save**
-5. **📝 จดบันทึก Template ID** (เช่น template_uvw456)
+5. คลิก **Save**
+6. **📝 จด Template ID** (เช่น template_uvw456)
 
 ---
 
 ### **ขั้นตอนที่ 4: ดู Public Key**
 
 1. ไปที่ **Account** → **General**
-2. หา **Public Key** ในส่วน **API Keys**
-3. **📝 จดบันทึก Public Key** (เช่น xYz123AbC456)
+2. หา **Public Key**
+3. **📝 จด Public Key** (เช่น xYz123AbC456)
 
 ---
 
 ### **ขั้นตอนที่ 5: แก้ไขไฟล์ app.js**
 
-1. เปิดไฟล์ **app.js**
-2. แก้ไขบรรทัดที่ 3-6 ด้วยข้อมูลที่จดไว้:
+1. เปิดไฟล์ **app.js** ที่ได้รับ
+2. แก้บรรทัดที่ 2-4:
 
 ```javascript
 const EMAILJS_PUBLIC_KEY = 'ใส่ Public Key ของคุณ';
@@ -159,101 +189,99 @@ const EMAILJS_TEMPLATE_BORROWER = 'ใส่ Template ID สำหรับผ�
 const EMAILJS_TEMPLATE_APPROVER = 'ใส่ Template ID สำหรับผู้อนุมัติ';
 ```
 
-**ตัวอย่าง:**
+3. แก้บรรทัดที่ 9 (URL ของเว็บไซต์):
+
+```javascript
+const SYSTEM_URL = 'https://your-username.github.io/laptop-borrowing-system/';
+```
+
+**ตัวอย่างหลังแก้:**
 ```javascript
 const EMAILJS_PUBLIC_KEY = 'xYz123AbC456';
 const EMAILJS_SERVICE_ID = 'service_abc123';
 const EMAILJS_TEMPLATE_BORROWER = 'template_xyz789';
 const EMAILJS_TEMPLATE_APPROVER = 'template_uvw456';
+
+const SYSTEM_URL = 'https://arryalonche13.github.io/laptop-borrowing-system/';
 ```
 
-3. บันทึกไฟล์
+4. **บันทึกไฟล์**
 
 ---
 
 ### **ขั้นตอนที่ 6: Upload ไป GitHub**
 
-1. ไปที่ https://github.com และ Login
-2. คลิก **New Repository** (ปุ่มสีเขียว)
-3. ตั้งชื่อ Repository เช่น `laptop-borrowing-system`
-4. เลือก **Public**
-5. คลิก **Create Repository**
-6. Upload ไฟล์ทั้ง 3 ไฟล์:
-   - index.html
-   - app.js
-   - README.md
+1. ไปที่ Repository: https://github.com/Arryalonche13/laptop-borrowing-system
+2. คลิก **Upload files**
+3. ลาก 2 ไฟล์:
+   - **index.html** (ไฟล์เดิม ไม่ต้องเปลี่ยน)
+   - **app.js** (ไฟล์ใหม่ที่แก้แล้ว - ให้เขียนทับไฟล์เดิม)
+4. คลิก **Commit changes**
 
 ---
 
-### **ขั้นตอนที่ 7: เปิด GitHub Pages (ทำให้เว็บออนไลน์)**
+### **ขั้นตอนที่ 7: ทดสอบระบบ**
 
-1. ใน Repository คลิก **Settings**
-2. คลิก **Pages** (เมนูด้านซ้าย)
-3. ใน **Source** เลือก **Deploy from a branch**
-4. เลือก Branch: **main** และ Folder: **/ (root)**
-5. คลิก **Save**
-6. รอประมาณ 1-2 นาที
-7. รีเฟรชหน้า จะเห็น URL เว็บไซต์ของคุณ เช่น:
-   ```
-   https://your-username.github.io/laptop-borrowing-system/
-   ```
-
----
-
-## ✅ เสร็จสิ้น! ระบบพร้อมใช้งาน
-
-เปิดเว็บไซต์ตาม URL ที่ได้ แล้วทดสอบส่งอีเมล!
-
----
-
-## 🔧 การตั้งค่าเพิ่มเติม
-
-### **ตั้งค่าผู้อนุมัติ**
-
-1. เข้าสู่ระบบด้วย:
-   - **Username**: suttipong.p@psu.ac.th
-   - **Password**: 123456789
-2. ไปที่หน้า **การจัดการสิทธิ์**
-3. ใส่อีเมลผู้อนุมัติ
-4. กด Save
-
-### **เปลี่ยนรหัสผ่าน**
-
-แก้ไขในไฟล์ `app.js` บรรทัดที่ประมาณ 430:
-
-```javascript
-if (password !== '123456789') {  // เปลี่ยนรหัสผ่านตรงนี้
-```
+1. เปิดเว็บไซต์: https://arryalonche13.github.io/laptop-borrowing-system/
+2. ไปที่หน้า **การจัดการสิทธิ์**:
+   - Login ด้วย: suttipong.p@psu.ac.th / 123456789
+   - ใส่อีเมลผู้อนุมัติ (เช่น parinyasiris@gmail.com)
+   - กด Save
+3. ทดสอบส่งคำขอยืม:
+   - กรอกข้อมูลครบ
+   - ใส่อีเมลของคุณ
+   - กดส่งคำขอ
+4. ตรวจสอบอีเมล:
+   - ✅ ผู้ยืมได้อีเมล "ยืนยันการส่งคำขอ"
+   - ✅ ผู้อนุมัติได้อีเมล "มีคำขอยืม" พร้อมปุ่มอนุมัติ/ไม่อนุมัติ
+5. คลิกปุ่มอนุมัติ/ไม่อนุมัติในอีเมล
+6. ตรวจสอบอีเมลอีกครั้ง:
+   - ✅ ผู้ยืมได้อีเมลแจ้งผล
+   - ✅ ผู้ดูแลระบบ (suttipong.p@psu.ac.th) ได้สำเนา
 
 ---
 
-## 📊 ข้อจำกัดของแผนฟรี
+## 🎯 สิ่งที่ระบบทำได้ตอนนี้:
 
-- **EmailJS**: ส่งได้ 200 อีเมล/เดือน (เพียงพอสำหรับองค์กรขนาดเล็ก)
-- **GitHub Pages**: ไม่จำกัด Traffic (ใช้ได้ไม่จำกัด)
+1. ✅ ส่งอีเมลถูกต้อง (ไม่สลับกัน)
+2. ✅ มีปุ่มอนุมัติ/ไม่อนุมัติในอีเมล
+3. ✅ คลิกปุ่มแล้วอัพเดทสถานะอัตโนมัติ
+4. ✅ ส่งอีเมลแจ้งผลกลับผู้ยืม
+5. ✅ ส่งสำเนาให้ผู้ดูแลระบบ
+6. ✅ อัพเดทสถานะคอมพิวเตอร์อัตโนมัติ (เมื่ออนุมัติ)
 
 ---
 
-## 🆘 แก้ปัญหา
+## 🔧 การแก้ปัญหา
 
-### **อีเมลไม่ถูกส่ง**
-1. ตรวจสอบ API Keys ใน app.js
-2. ตรวจสอบว่า Gmail อนุญาตการเข้าถึงจาก EmailJS แล้ว
-3. เปิด Console (F12) เพื่อดู Error
+### **อีเมลยังส่งผิดอยู่:**
+- ตรวจสอบ To Email ใน Template ต้องเป็น `{{to_email}}`
+- ไม่ใช่อีเมลตายตัว
 
-### **เว็บไม่แสดง**
-1. ตรวจสอบว่าไฟล์ชื่อ index.html (ตัวพิมพ์เล็กทั้งหมด)
-2. รอ 2-3 นาทีหลัง Deploy
-3. ลอง Hard Refresh (Ctrl + Shift + R)
+### **ปุ่มอนุมัติ/ไม่อนุมัติไม่ทำงาน:**
+- ตรวจสอบ SYSTEM_URL ใน app.js ต้องถูกต้อง
+- ต้องมี `/` ท้ายสุด
+
+### **ไม่ได้รับอีเมลแจ้งผล:**
+- ตรวจสอบว่าใช้ Template เดียวกัน (EMAILJS_TEMPLATE_BORROWER)
+- ตรวจสอบ Spam/Junk Mail
 
 ---
 
 ## 📞 ติดต่อ
 
-หากมีปัญหาหรือต้องการความช่วยเหลือ:
+หากมีปัญหา:
 - อีเมล: suttipong.p@psu.ac.th
 - โทร: 9608
 
 ---
 
-## 🎉 ขอให้ใช้งานระบบอย่างมีความสุข!
+## 🎉 สรุป
+
+ระบบใหม่นี้แก้ปัญหาทั้งหมดแล้ว:
+- ✅ อีเมลส่งถูกคน
+- ✅ มีปุ่มอนุมัติ/ไม่อนุมัติ
+- ✅ แจ้งผลกลับอัตโนมัติ
+- ✅ ส่งสำเนาให้ผู้ดูแลระบบ
+
+**ขอให้ใช้งานอย่างมีความสุข!** 🎊

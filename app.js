@@ -1,10 +1,11 @@
-// ตั้งค่า EmailJS
-// คุณต้องสมัคร EmailJS ที่ https://www.emailjs.com/
-// และแทนค่าเหล่านี้ด้วยค่าจริงของคุณ
-const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T'; // แทนด้วย Public Key ของคุณ
-const EMAILJS_SERVICE_ID = 'service_vr051ds'; // แทนด้วย Service ID ของคุณ
-const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหรับผู้ยืม
+// ตั้งค่า EmailJS - แทนด้วยค่าจริงของคุณ
+const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T'; // แทนด้วย Public Key
+const EMAILJS_SERVICE_ID = 'service_vr051ds'; // แทนด้วย Service ID
+const EMAILJS_TEMPLATE_BORROWER = 'YOUR_TEMPLATE_ID_BORROWER'; // Template สำหรับผู้ยืม
 const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i'; // Template สำหรับผู้อนุมัติ
+
+// URL ของระบบ - แก้เป็น URL จริงของคุณ
+const SYSTEM_URL = 'https://arrvalonche13.github.io/laptop-borrowing-system/';
 
 // เริ่มต้น EmailJS
 (function() {
@@ -30,6 +31,7 @@ function initializeSystem() {
     updateManagementGrid();
     updateLogsTable();
     checkLogin();
+    checkApprovalAction();
 }
 
 // โหลดข้อมูลจาก localStorage
@@ -44,8 +46,12 @@ function loadData() {
 
     if (storedPermissions) {
         permissions = JSON.parse(storedPermissions);
-        document.getElementById('approverEmail').value = permissions.approver || '';
-        document.getElementById('assistantAdminEmail').value = permissions.assistantAdmin || '';
+        if (document.getElementById('approverEmail')) {
+            document.getElementById('approverEmail').value = permissions.approver || '';
+        }
+        if (document.getElementById('assistantAdminEmail')) {
+            document.getElementById('assistantAdminEmail').value = permissions.assistantAdmin || '';
+        }
     }
 
     if (storedLogs) {
@@ -79,7 +85,7 @@ function savePermissions() {
     permissions.approver = document.getElementById('approverEmail').value;
     permissions.assistantAdmin = document.getElementById('assistantAdminEmail').value;
     localStorage.setItem('permissions', JSON.stringify(permissions));
-    showAlert('bookingAlert', 'success', '✅ บันทึกการตั้งค่าสิทธิ์เรียบร้อยแล้ว');
+    alert('✅ บันทึกการตั้งค่าสิทธิ์เรียบร้อยแล้ว');
 }
 
 function saveLogs() {
@@ -89,6 +95,8 @@ function saveLogs() {
 // แสดงคอมพิวเตอร์ (หน้าที่ 1)
 function displayComputers() {
     const grid = document.getElementById('computers-grid');
+    if (!grid) return;
+    
     grid.innerHTML = '';
 
     let availableCount = 0;
@@ -168,6 +176,8 @@ function selectComputerForBooking(computerId) {
 // อัพเดท dropdown ของคอมพิวเตอร์
 function updateComputerDropdown() {
     const select = document.getElementById('computerId');
+    if (!select) return;
+    
     select.innerHTML = '<option value="">-- เลือกคอมพิวเตอร์ --</option>';
 
     computers.forEach(computer => {
@@ -245,7 +255,6 @@ async function submitBooking(event) {
         return;
     }
 
-    // ตรวจสอบว่ามีผู้อนุมัติหรือยัง
     if (!permissions.approver) {
         showAlert('bookingAlert', 'error', '❌ กรุณาตั้งค่าอีเมลผู้อนุมัติในหน้าการจัดการสิทธิ์ก่อน');
         return;
@@ -255,7 +264,10 @@ async function submitBooking(event) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<div class="spinner"></div> กำลังส่งคำขอ...';
 
+    const requestId = Date.now().toString();
+    
     const formData = {
+        requestId: requestId,
         borrowerName: document.getElementById('borrowerName').value,
         computerId: document.getElementById('computerId').value,
         borrowerType: document.getElementById('borrowerType').value,
@@ -280,18 +292,15 @@ async function submitBooking(event) {
         logs.push(formData);
         saveLogs();
 
-        showAlert('bookingAlert', 'success', '✅ ส่งคำขอยืมคอมพิวเตอร์เรียบร้อยแล้ว! ระบบได้ส่งอีเมลยืนยันไปที่ ' + formData.borrowerEmail + ' และอีเมลขออนุมัติไปที่ผู้อนุมัติแล้ว');
+        showAlert('bookingAlert', 'success', '✅ ส่งคำขอยืมคอมพิวเตอร์เรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลยืนยันไปที่ ' + formData.borrowerEmail + ' และอีเมลขออนุมัติไปที่ผู้อนุมัติแล้ว');
 
-        // รีเซ็ตฟอร์ม
         document.getElementById('bookingForm').reset();
         updateBorrowerTypeField();
-
-        // เลื่อนไปด้านบน
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
         console.error('Error sending email:', error);
-        showAlert('bookingAlert', 'error', '❌ เกิดข้อผิดพลาดในการส่งอีเมล กรุณาตรวจสอบการตั้งค่า EmailJS');
+        showAlert('bookingAlert', 'error', '❌ เกิดข้อผิดพลาดในการส่งอีเมล: ' + error.text);
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '✅ ยืนยันส่งคำขอยืมคอมพิวเตอร์';
@@ -301,7 +310,7 @@ async function submitBooking(event) {
 // ส่งอีเมลไปยังผู้ยืม
 async function sendEmailToBorrower(formData) {
     const templateParams = {
-        to_email: formData.borrowerEmail,
+        to_email: formData.borrowerEmail, // ส่งถึงผู้ยืม
         borrower_name: formData.borrowerName,
         computer_id: formData.computerId,
         start_date: formatDateThai(formData.startDate),
@@ -317,9 +326,13 @@ async function sendEmailToBorrower(formData) {
 
 // ส่งอีเมลไปยังผู้อนุมัติ
 async function sendEmailToApprover(formData) {
+    const approvalLink = `${SYSTEM_URL}?action=approve&id=${formData.requestId}`;
+    const rejectionLink = `${SYSTEM_URL}?action=reject&id=${formData.requestId}`;
+    
     const templateParams = {
-        to_email: permissions.approver,
+        to_email: permissions.approver, // ส่งถึงผู้อนุมัติ
         borrower_name: formData.borrowerName,
+        borrower_email: formData.borrowerEmail,
         computer_id: formData.computerId,
         start_date: formatDateThai(formData.startDate),
         end_date: formatDateThai(formData.endDate),
@@ -327,11 +340,148 @@ async function sendEmailToApprover(formData) {
         borrower_type: getStatusText(formData.borrowerType),
         student_id: formData.studentId || '-',
         department: formData.department || '-',
-        borrower_email: formData.borrowerEmail,
-        request_date: formatDateTimeThai(formData.requestDate)
+        request_date: formatDateTimeThai(formData.requestDate),
+        approval_link: approvalLink,
+        rejection_link: rejectionLink
     };
 
     return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APPROVER, templateParams);
+}
+
+// ตรวจสอบการอนุมัติ/ไม่อนุมัติจาก URL
+function checkApprovalAction() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    const requestId = urlParams.get('id');
+
+    if (action && requestId) {
+        const logIndex = logs.findIndex(log => log.requestId === requestId);
+        
+        if (logIndex !== -1 && logs[logIndex].status === 'pending') {
+            if (action === 'approve') {
+                approveRequest(logIndex);
+            } else if (action === 'reject') {
+                rejectRequest(logIndex);
+            }
+        }
+        
+        // ลบ query string จาก URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+// อนุมัติคำขอ
+async function approveRequest(logIndex) {
+    const log = logs[logIndex];
+    
+    log.status = 'approved';
+    log.approverName = permissions.approver;
+    log.approvalDate = new Date().toISOString();
+    
+    // อัพเดทสถานะคอมพิวเตอร์
+    const computerIndex = computers.findIndex(c => c.id === log.computerId);
+    if (computerIndex !== -1) {
+        computers[computerIndex].status = 'borrowed';
+        computers[computerIndex].dueDate = log.endDate;
+        computers[computerIndex].borrower = log.borrowerName;
+        saveComputers();
+    }
+    
+    saveLogs();
+    
+    // ส่งอีเมลแจ้งผลการอนุมัติ
+    await sendApprovalResultEmail(log, true);
+    
+    alert('✅ อนุมัติคำขอเรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลแจ้งผู้ยืมและผู้ดูแลระบบแล้ว');
+    
+    displayComputers();
+    updateLogsTable();
+}
+
+// ไม่อนุมัติคำขอ
+async function rejectRequest(logIndex) {
+    const log = logs[logIndex];
+    
+    log.status = 'rejected';
+    log.approverName = permissions.approver;
+    log.approvalDate = new Date().toISOString();
+    
+    saveLogs();
+    
+    // ส่งอีเมลแจ้งผลไม่อนุมัติ
+    await sendApprovalResultEmail(log, false);
+    
+    alert('❌ ไม่อนุมัติคำขอเรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลแจ้งผู้ยืมและผู้ดูแลระบบแล้ว');
+    
+    updateLogsTable();
+}
+
+// ส่งอีเมลแจ้งผลการพิจารณา
+async function sendApprovalResultEmail(log, isApproved) {
+    const status = isApproved ? 'อนุมัติ' : 'ไม่อนุมัติ';
+    const statusColor = isApproved ? '#10b981' : '#ef4444';
+    
+    const emailContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
+        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
+            <h2 style="color: ${statusColor}; text-align: center;">
+                ${isApproved ? '✅' : '❌'} ผลการพิจารณาคำขอยืมคอมพิวเตอร์
+            </h2>
+            
+            <div style="background: ${isApproved ? '#d1fae5' : '#fee2e2'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="font-size: 18px; font-weight: bold; text-align: center; margin: 0;">
+                    คำขอของคุณได้รับการ${status}
+                </p>
+            </div>
+            
+            <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3>📋 รายละเอียดคำขอ</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 8px 0;"><strong>ผู้ยืม:</strong> ${log.borrowerName}</li>
+                    <li style="padding: 8px 0;"><strong>รหัสคอมพิวเตอร์:</strong> ${log.computerId}</li>
+                    <li style="padding: 8px 0;"><strong>วันที่เริ่มยืม:</strong> ${formatDateThai(log.startDate)}</li>
+                    <li style="padding: 8px 0;"><strong>วันที่คืน:</strong> ${formatDateThai(log.endDate)}</li>
+                    <li style="padding: 8px 0;"><strong>ผู้พิจารณา:</strong> ${log.approverName}</li>
+                    <li style="padding: 8px 0;"><strong>วันที่พิจารณา:</strong> ${formatDateTimeThai(log.approvalDate)}</li>
+                </ul>
+            </div>
+            
+            ${isApproved ? `
+            <div style="background: #dcfce7; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
+                <p style="margin: 0;"><strong>✅ กรุณามารับคอมพิวเตอร์ตามวันที่กำหนด</strong></p>
+                <p style="margin: 10px 0 0 0;">อย่าลืมนำบัตรประชาชนหรือบัตรนักศึกษามาด้วย</p>
+            </div>
+            ` : `
+            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <p style="margin: 0;"><strong>❌ คำขอของท่านไม่ได้รับการอนุมัติ</strong></p>
+                <p style="margin: 10px 0 0 0;">หากมีข้อสงสัย กรุณาติดต่อผู้อนุมัติ</p>
+            </div>
+            `}
+            
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
+            
+            <p style="font-size: 14px; color: #718096; text-align: center;">
+                ระบบยืมคืนคอมพิวเตอร์พกพา<br>
+                มหาวิทยาลัยสงขลานครินทร์<br>
+                ติดต่อ: suttipong.p@psu.ac.th | 9608
+            </p>
+        </div>
+    </div>
+    `;
+    
+    // ส่งให้ผู้ยืม
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+        to_email: log.borrowerEmail,
+        subject: `${isApproved ? '✅ อนุมัติ' : '❌ ไม่อนุมัติ'}คำขอยืมคอมพิวเตอร์`,
+        html_content: emailContent
+    });
+    
+    // ส่งสำเนาให้ผู้ดูแลระบบ
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+        to_email: permissions.admin,
+        subject: `[สำเนา] ${isApproved ? '✅ อนุมัติ' : '❌ ไม่อนุมัติ'}คำขอยืม - ${log.borrowerName}`,
+        html_content: emailContent
+    });
 }
 
 // แปลงวันที่เป็นภาษาไทย
@@ -390,6 +540,8 @@ function getStatusText(type) {
 // อัพเดท Management Grid (หน้าที่ 4)
 function updateManagementGrid() {
     const grid = document.getElementById('management-grid');
+    if (!grid) return;
+    
     grid.innerHTML = '';
 
     computers.forEach((computer, index) => {
@@ -472,6 +624,8 @@ function saveComputerChanges(index) {
 // อัพเดทตาราง Logs (หน้าที่ 5)
 function updateLogsTable() {
     const tbody = document.getElementById('logs-tbody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
 
     if (logs.length === 0) {
