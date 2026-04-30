@@ -1,11 +1,11 @@
 // ตั้งค่า EmailJS - แทนด้วยค่าจริงของคุณ
-const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T'; // แทนด้วย Public Key
-const EMAILJS_SERVICE_ID = 'service_vr051ds'; // แทนด้วย Service ID
-const EMAILJS_TEMPLATE_BORROWER = 'YOUR_TEMPLATE_ID_BORROWER'; // Template สำหรับผู้ยืม
+const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T';
+const EMAILJS_SERVICE_ID = 'service_vr051ds';
+const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหรับผู้ยืม
 const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i'; // Template สำหรับผู้อนุมัติ
 
 // URL ของระบบ - แก้เป็น URL จริงของคุณ
-const SYSTEM_URL = 'https://arrvalonche13.github.io/laptop-borrowing-system/';
+const SYSTEM_URL = 'https://arryalonche13.github.io/laptop-borrowing-system/';
 
 // เริ่มต้น EmailJS
 (function() {
@@ -31,7 +31,6 @@ function initializeSystem() {
     updateManagementGrid();
     updateLogsTable();
     checkLogin();
-    checkApprovalAction();
 }
 
 // โหลดข้อมูลจาก localStorage
@@ -310,7 +309,7 @@ async function submitBooking(event) {
 // ส่งอีเมลไปยังผู้ยืม
 async function sendEmailToBorrower(formData) {
     const templateParams = {
-        to_email: formData.borrowerEmail, // ส่งถึงผู้ยืม
+        to_email: formData.borrowerEmail,
         borrower_name: formData.borrowerName,
         computer_id: formData.computerId,
         start_date: formatDateThai(formData.startDate),
@@ -326,11 +325,10 @@ async function sendEmailToBorrower(formData) {
 
 // ส่งอีเมลไปยังผู้อนุมัติ
 async function sendEmailToApprover(formData) {
-    const approvalLink = `${SYSTEM_URL}?action=approve&id=${formData.requestId}`;
-    const rejectionLink = `${SYSTEM_URL}?action=reject&id=${formData.requestId}`;
+    const approvalLink = `${SYSTEM_URL}#approve`;
     
     const templateParams = {
-        to_email: permissions.approver, // ส่งถึงผู้อนุมัติ
+        to_email: permissions.approver,
         borrower_name: formData.borrowerName,
         borrower_email: formData.borrowerEmail,
         computer_id: formData.computerId,
@@ -342,32 +340,10 @@ async function sendEmailToApprover(formData) {
         department: formData.department || '-',
         request_date: formatDateTimeThai(formData.requestDate),
         approval_link: approvalLink,
-        rejection_link: rejectionLink
+        rejection_link: approvalLink
     };
 
     return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APPROVER, templateParams);
-}
-
-// ตรวจสอบการอนุมัติ/ไม่อนุมัติจาก URL
-function checkApprovalAction() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const action = urlParams.get('action');
-    const requestId = urlParams.get('id');
-
-    if (action && requestId) {
-        const logIndex = logs.findIndex(log => log.requestId === requestId);
-        
-        if (logIndex !== -1 && logs[logIndex].status === 'pending') {
-            if (action === 'approve') {
-                approveRequest(logIndex);
-            } else if (action === 'reject') {
-                rejectRequest(logIndex);
-            }
-        }
-        
-        // ลบ query string จาก URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
 }
 
 // อนุมัติคำขอ
@@ -375,7 +351,7 @@ async function approveRequest(logIndex) {
     const log = logs[logIndex];
     
     log.status = 'approved';
-    log.approverName = permissions.approver;
+    log.approverName = currentUser;
     log.approvalDate = new Date().toISOString();
     
     // อัพเดทสถานะคอมพิวเตอร์
@@ -402,9 +378,12 @@ async function approveRequest(logIndex) {
 async function rejectRequest(logIndex) {
     const log = logs[logIndex];
     
+    const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี):');
+    
     log.status = 'rejected';
-    log.approverName = permissions.approver;
+    log.approverName = currentUser;
     log.approvalDate = new Date().toISOString();
+    log.rejectionReason = reason || '';
     
     saveLogs();
     
@@ -420,22 +399,25 @@ async function rejectRequest(logIndex) {
 async function sendApprovalResultEmail(log, isApproved) {
     const status = isApproved ? 'อนุมัติ' : 'ไม่อนุมัติ';
     const statusColor = isApproved ? '#10b981' : '#ef4444';
+    const bgColor = isApproved ? '#d1fae5' : '#fee2e2';
     
-    const emailContent = `
+    let emailSubject = isApproved ? '✅ อนุมัติคำขอยืมคอมพิวเตอร์' : '❌ ไม่อนุมัติคำขอยืมคอมพิวเตอร์';
+    
+    const htmlContent = `
     <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
-        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
+        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h2 style="color: ${statusColor}; text-align: center;">
                 ${isApproved ? '✅' : '❌'} ผลการพิจารณาคำขอยืมคอมพิวเตอร์
             </h2>
             
-            <div style="background: ${isApproved ? '#d1fae5' : '#fee2e2'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <div style="background: ${bgColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p style="font-size: 18px; font-weight: bold; text-align: center; margin: 0;">
                     คำขอของคุณได้รับการ${status}
                 </p>
             </div>
             
             <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3>📋 รายละเอียดคำขอ</h3>
+                <h3 style="color: #2d3748; margin-top: 0;">📋 รายละเอียดคำขอ</h3>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 8px 0;"><strong>ผู้ยืม:</strong> ${log.borrowerName}</li>
                     <li style="padding: 8px 0;"><strong>รหัสคอมพิวเตอร์:</strong> ${log.computerId}</li>
@@ -443,6 +425,7 @@ async function sendApprovalResultEmail(log, isApproved) {
                     <li style="padding: 8px 0;"><strong>วันที่คืน:</strong> ${formatDateThai(log.endDate)}</li>
                     <li style="padding: 8px 0;"><strong>ผู้พิจารณา:</strong> ${log.approverName}</li>
                     <li style="padding: 8px 0;"><strong>วันที่พิจารณา:</strong> ${formatDateTimeThai(log.approvalDate)}</li>
+                    ${!isApproved && log.rejectionReason ? `<li style="padding: 8px 0;"><strong>เหตุผล:</strong> ${log.rejectionReason}</li>` : ''}
                 </ul>
             </div>
             
@@ -470,18 +453,36 @@ async function sendApprovalResultEmail(log, isApproved) {
     `;
     
     // ส่งให้ผู้ยืม
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
-        to_email: log.borrowerEmail,
-        subject: `${isApproved ? '✅ อนุมัติ' : '❌ ไม่อนุมัติ'}คำขอยืมคอมพิวเตอร์`,
-        html_content: emailContent
-    });
-    
-    // ส่งสำเนาให้ผู้ดูแลระบบ
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
-        to_email: permissions.admin,
-        subject: `[สำเนา] ${isApproved ? '✅ อนุมัติ' : '❌ ไม่อนุมัติ'}คำขอยืม - ${log.borrowerName}`,
-        html_content: emailContent
-    });
+    try {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+            to_email: log.borrowerEmail,
+            subject: emailSubject,
+            borrower_name: log.borrowerName,
+            computer_id: log.computerId,
+            start_date: formatDateThai(log.startDate),
+            end_date: formatDateThai(log.endDate),
+            purpose: htmlContent,
+            borrower_type: '',
+            student_id: '',
+            department: ''
+        });
+        
+        // ส่งสำเนาให้ผู้ดูแลระบบ
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+            to_email: permissions.admin,
+            subject: `[สำเนา] ${emailSubject} - ${log.borrowerName}`,
+            borrower_name: log.borrowerName,
+            computer_id: log.computerId,
+            start_date: formatDateThai(log.startDate),
+            end_date: formatDateThai(log.endDate),
+            purpose: htmlContent,
+            borrower_type: '',
+            student_id: '',
+            department: ''
+        });
+    } catch (error) {
+        console.error('Error sending result email:', error);
+    }
 }
 
 // แปลงวันที่เป็นภาษาไทย
@@ -629,13 +630,13 @@ function updateLogsTable() {
     tbody.innerHTML = '';
 
     if (logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px; color: #a0aec0;">ยังไม่มีข้อมูล Log</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: #a0aec0;">ยังไม่มีข้อมูล Log</td></tr>';
         return;
     }
 
     const sortedLogs = [...logs].reverse();
 
-    sortedLogs.forEach(log => {
+    sortedLogs.forEach((log, index) => {
         const tr = document.createElement('tr');
         
         const requestDate = new Date(log.requestDate).toLocaleDateString('th-TH', {
@@ -648,12 +649,21 @@ function updateLogsTable() {
 
         let statusClass = 'status-pending';
         let statusText = 'รอการอนุมัติ';
+        let actionButtons = '';
+        
         if (log.status === 'approved') {
             statusClass = 'status-approved';
             statusText = 'อนุมัติ';
         } else if (log.status === 'rejected') {
             statusClass = 'status-rejected';
             statusText = 'ไม่อนุมัติ';
+        } else if (log.status === 'pending' && currentUser) {
+            // แสดงปุ่มอนุมัติ/ไม่อนุมัติสำหรับคำขอที่รอพิจารณา
+            const logIndex = logs.length - 1 - index; // หา index จริงใน array
+            actionButtons = `
+                <button class="btn-save" onclick="approveRequest(${logIndex})" style="background: #10b981; margin-right: 5px;">✅ อนุมัติ</button>
+                <button class="btn-save" onclick="rejectRequest(${logIndex})" style="background: #ef4444;">❌ ไม่อนุมัติ</button>
+            `;
         }
 
         tr.innerHTML = `
@@ -665,6 +675,7 @@ function updateLogsTable() {
             <td class="${statusClass}">${statusText}</td>
             <td>${log.approverName || '-'}</td>
             <td>${log.approvalDate ? new Date(log.approvalDate).toLocaleDateString('th-TH') : '-'}</td>
+            <td>${actionButtons}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -725,6 +736,7 @@ function login(event) {
         currentUser = email;
         checkLogin();
         closeLoginModal();
+        updateLogsTable(); // Refresh logs to show action buttons
         alert('✅ เข้าสู่ระบบสำเร็จ!');
     } else {
         alert('❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
