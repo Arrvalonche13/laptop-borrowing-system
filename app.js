@@ -5,7 +5,7 @@ const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหร�
 const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i'; // Template สำหรับผู้อนุมัติ
 
 // URL ของระบบ - แก้เป็น URL จริงของคุณ
-const SYSTEM_URL = 'https://arryalonche13.github.io/laptop-borrowing-system/';
+const SYSTEM_URL = 'https://arrvalonche13.github.io/laptop-borrowing-system/';
 
 // เริ่มต้น EmailJS
 (function() {
