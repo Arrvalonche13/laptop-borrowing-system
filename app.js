@@ -1,7 +1,7 @@
 // ตั้งค่า EmailJS - แทนด้วยค่าจริงของคุณ
 const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T';
 const EMAILJS_SERVICE_ID = 'service_vr051ds';
-const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหรับผู้ยืม
+const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหรับผู้ยืม (ใช้ส่ง HTML แบบกำหนดเอง)
 const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i'; // Template สำหรับผู้อนุมัติ
 
 // URL ของระบบ - แก้เป็น URL จริงของคุณ
@@ -308,16 +308,53 @@ async function submitBooking(event) {
 
 // ส่งอีเมลไปยังผู้ยืม
 async function sendEmailToBorrower(formData) {
+    const htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
+        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #667eea; text-align: center;">✅ ยืนยันการส่งคำขอยืมคอมพิวเตอร์</h2>
+            
+            <p>เรียน คุณ${formData.borrowerName}</p>
+            
+            <p>ระบบได้รับคำขอยืมคอมพิวเตอร์ของท่านเรียบร้อยแล้ว</p>
+            
+            <div style="background: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #2d3748; margin-top: 0;">📋 รายละเอียดการยืม</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <li style="padding: 8px 0;"><strong>รหัสคอมพิวเตอร์:</strong> ${formData.computerId}</li>
+                    <li style="padding: 8px 0;"><strong>สถานะผู้ยืม:</strong> ${getStatusText(formData.borrowerType)}</li>
+                    <li style="padding: 8px 0;"><strong>รหัสนักศึกษา/สังกัด:</strong> ${formData.studentId || formData.department || '-'}</li>
+                    <li style="padding: 8px 0;"><strong>วันที่เริ่มยืม:</strong> ${formatDateThai(formData.startDate)}</li>
+                    <li style="padding: 8px 0;"><strong>วันที่คืน:</strong> ${formatDateThai(formData.endDate)}</li>
+                    <li style="padding: 8px 0;"><strong>วัตถุประสงค์:</strong> ${formData.purpose}</li>
+                </ul>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                <p style="margin: 0;">⏳ <strong>กรุณารอการอนุมัติจากผู้อนุมัติ</strong></p>
+                <p style="margin: 10px 0 0 0; font-size: 14px;">ท่านจะได้รับอีเมลแจ้งผลการพิจารณาอีกครั้ง</p>
+            </div>
+            
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
+            
+            <p style="font-size: 14px; color: #718096; text-align: center;">
+                หากมีข้อสงสัยกรุณาติดต่อ<br>
+                นายสุทธิพงศ์ ปริญญาศิริ<br>
+                📧 suttipong.p@psu.ac.th | ☎️ 9608
+            </p>
+        </div>
+    </div>
+    `;
+    
     const templateParams = {
         to_email: formData.borrowerEmail,
         borrower_name: formData.borrowerName,
         computer_id: formData.computerId,
         start_date: formatDateThai(formData.startDate),
         end_date: formatDateThai(formData.endDate),
-        purpose: formData.purpose,
-        borrower_type: getStatusText(formData.borrowerType),
-        student_id: formData.studentId || '-',
-        department: formData.department || '-'
+        purpose: htmlContent,
+        borrower_type: '',
+        student_id: '',
+        department: ''
     };
 
     return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, templateParams);
@@ -401,8 +438,6 @@ async function sendApprovalResultEmail(log, isApproved) {
     const statusColor = isApproved ? '#10b981' : '#ef4444';
     const bgColor = isApproved ? '#d1fae5' : '#fee2e2';
     
-    let emailSubject = isApproved ? '✅ อนุมัติคำขอยืมคอมพิวเตอร์' : '❌ ไม่อนุมัติคำขอยืมคอมพิวเตอร์';
-    
     const htmlContent = `
     <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
         <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -456,11 +491,10 @@ async function sendApprovalResultEmail(log, isApproved) {
     try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
             to_email: log.borrowerEmail,
-            subject: emailSubject,
             borrower_name: log.borrowerName,
             computer_id: log.computerId,
-            start_date: formatDateThai(log.startDate),
-            end_date: formatDateThai(log.endDate),
+            start_date: '',
+            end_date: '',
             purpose: htmlContent,
             borrower_type: '',
             student_id: '',
@@ -470,11 +504,10 @@ async function sendApprovalResultEmail(log, isApproved) {
         // ส่งสำเนาให้ผู้ดูแลระบบ
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
             to_email: permissions.admin,
-            subject: `[สำเนา] ${emailSubject} - ${log.borrowerName}`,
             borrower_name: log.borrowerName,
             computer_id: log.computerId,
-            start_date: formatDateThai(log.startDate),
-            end_date: formatDateThai(log.endDate),
+            start_date: '',
+            end_date: '',
             purpose: htmlContent,
             borrower_type: '',
             student_id: '',
