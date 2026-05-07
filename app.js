@@ -1,18 +1,46 @@
-// ตั้งค่า EmailJS - แทนด้วยค่าจริงของคุณ
+// =========================================
+// Firebase Configuration
+// =========================================
+// แทนค่าเหล่านี้ด้วยค่าจาก Firebase Console
+const firebaseConfig = {
+  apiKey: "AIzaSyAdsomgEimu1y34eu_ubPd0fOYW5F1lzYg",
+  authDomain: "laptop-borrowing-system-e8a4e.firebaseapp.com",
+  databaseURL: "https://laptop-borrowing-system-e8a4e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "laptop-borrowing-system-e8a4e",
+  storageBucket: "laptop-borrowing-system-e8a4e.firebasestorage.app",
+  messagingSenderId: "794986308404",
+  appId: "1:794986308404:web:2f32d61c85cd920034bb61",
+  measurementId: "G-ZRBDR0DN8L"
+};
+
+// =========================================
+// EmailJS Configuration
+// =========================================
 const EMAILJS_PUBLIC_KEY = 'mwvgufG3CgQA-lI8T';
 const EMAILJS_SERVICE_ID = 'service_vr051ds';
-const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd'; // Template สำหรับผู้ยืม (ใช้ส่ง HTML แบบกำหนดเอง)
-const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i'; // Template สำหรับผู้อนุมัติ
+const EMAILJS_TEMPLATE_BORROWER = 'template_kmslfjd';
+const EMAILJS_TEMPLATE_APPROVER = 'template_bbdq96i';
 
-// URL ของระบบ - แก้เป็น URL จริงของคุณ
+// URL ของระบบ
 const SYSTEM_URL = 'https://arrvalonche13.github.io/laptop-borrowing-system/';
+
+// =========================================
+// Initialize Firebase
+// =========================================
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, set, push, onValue, update, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
 
 // เริ่มต้น EmailJS
 (function() {
     emailjs.init(EMAILJS_PUBLIC_KEY);
 })();
 
-// ข้อมูลระบบ
+// =========================================
+// Global Variables
+// =========================================
 let computers = [];
 let permissions = {
     approver: '',
@@ -22,29 +50,34 @@ let permissions = {
 let logs = [];
 let currentUser = null;
 
-// เริ่มต้นระบบ
-function initializeSystem() {
-    loadData();
-    initializeComputers();
+// =========================================
+// Firebase Real-time Listeners
+// =========================================
+
+// Listen to computers changes
+const computersRef = ref(database, 'computers');
+onValue(computersRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        computers = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+        }));
+    } else {
+        // Initialize default computers if none exist
+        initializeComputers();
+    }
     displayComputers();
     updateComputerDropdown();
     updateManagementGrid();
-    updateLogsTable();
-    checkLogin();
-}
+});
 
-// โหลดข้อมูลจาก localStorage
-function loadData() {
-    const storedComputers = localStorage.getItem('computers');
-    const storedPermissions = localStorage.getItem('permissions');
-    const storedLogs = localStorage.getItem('logs');
-
-    if (storedComputers) {
-        computers = JSON.parse(storedComputers);
-    }
-
-    if (storedPermissions) {
-        permissions = JSON.parse(storedPermissions);
+// Listen to permissions changes
+const permissionsRef = ref(database, 'permissions');
+onValue(permissionsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        permissions = data;
         if (document.getElementById('approverEmail')) {
             document.getElementById('approverEmail').value = permissions.approver || '';
         }
@@ -52,46 +85,55 @@ function loadData() {
             document.getElementById('assistantAdminEmail').value = permissions.assistantAdmin || '';
         }
     }
+});
 
-    if (storedLogs) {
-        logs = JSON.parse(storedLogs);
+// Listen to logs changes
+const logsRef = ref(database, 'logs');
+onValue(logsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        logs = Object.keys(data).map(key => ({
+            logId: key,
+            ...data[key]
+        }));
+    } else {
+        logs = [];
+    }
+    updateLogsTable();
+});
+
+// =========================================
+// Initialization Functions
+// =========================================
+
+function initializeSystem() {
+    setMinDates();
+    checkLogin();
+}
+
+async function initializeComputers() {
+    const defaultComputers = {};
+    for (let i = 1; i <= 15; i++) {
+        const id = `VET ${i.toString().padStart(2, '0')}`;
+        defaultComputers[id] = {
+            status: 'available',
+            dueDate: null,
+            borrower: null,
+            note: ''
+        };
+    }
+    
+    try {
+        await set(computersRef, defaultComputers);
+    } catch (error) {
+        console.error('Error initializing computers:', error);
     }
 }
 
-// สร้างข้อมูลคอมพิวเตอร์เริ่มต้น
-function initializeComputers() {
-    if (computers.length === 0) {
-        for (let i = 1; i <= 15; i++) {
-            const id = i.toString().padStart(2, '0');
-            computers.push({
-                id: `VET ${id}`,
-                status: 'available',
-                dueDate: null,
-                borrower: null,
-                note: ''
-            });
-        }
-        saveComputers();
-    }
-}
+// =========================================
+// Display Functions
+// =========================================
 
-// บันทึกข้อมูล
-function saveComputers() {
-    localStorage.setItem('computers', JSON.stringify(computers));
-}
-
-function savePermissions() {
-    permissions.approver = document.getElementById('approverEmail').value;
-    permissions.assistantAdmin = document.getElementById('assistantAdminEmail').value;
-    localStorage.setItem('permissions', JSON.stringify(permissions));
-    alert('✅ บันทึกการตั้งค่าสิทธิ์เรียบร้อยแล้ว');
-}
-
-function saveLogs() {
-    localStorage.setItem('logs', JSON.stringify(logs));
-}
-
-// แสดงคอมพิวเตอร์ (หน้าที่ 1)
 function displayComputers() {
     const grid = document.getElementById('computers-grid');
     if (!grid) return;
@@ -102,7 +144,7 @@ function displayComputers() {
     let borrowedCount = 0;
     let maintenanceCount = 0;
 
-    computers.forEach((computer, index) => {
+    computers.forEach((computer) => {
         const card = document.createElement('div');
         card.className = `computer-card ${computer.status}`;
 
@@ -165,14 +207,12 @@ function displayComputers() {
     document.getElementById('count-maintenance').textContent = maintenanceCount;
 }
 
-// เลือกคอมพิวเตอร์เพื่อจอง
 function selectComputerForBooking(computerId) {
     showPage('booking');
     document.getElementById('computerId').value = computerId;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// อัพเดท dropdown ของคอมพิวเตอร์
 function updateComputerDropdown() {
     const select = document.getElementById('computerId');
     if (!select) return;
@@ -189,8 +229,143 @@ function updateComputerDropdown() {
     });
 }
 
-// อัพเดทช่องตามสถานะผู้ยืม
-function updateBorrowerTypeField() {
+function updateManagementGrid() {
+    const grid = document.getElementById('management-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+
+    computers.forEach((computer) => {
+        const card = document.createElement('div');
+        card.className = 'management-card';
+        card.innerHTML = `
+            <h4>💻 ${computer.id}</h4>
+            <div class="inline-form">
+                <div class="form-group">
+                    <label>สถานะ</label>
+                    <select id="status-${computer.id}" onchange="updateComputerStatus('${computer.id}')">
+                        <option value="available" ${computer.status === 'available' ? 'selected' : ''}>ว่าง</option>
+                        <option value="borrowed" ${computer.status === 'borrowed' ? 'selected' : ''}>ไม่ว่าง</option>
+                        <option value="maintenance" ${computer.status === 'maintenance' ? 'selected' : ''}>ชำรุด/รอซ่อม</option>
+                    </select>
+                </div>
+                <div class="form-group" id="duedate-group-${computer.id}" style="display: ${computer.status === 'borrowed' ? 'block' : 'none'};">
+                    <label>วันสิ้นสุดการยืม</label>
+                    <input type="date" id="duedate-${computer.id}" value="${computer.dueDate || ''}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>ชื่อผู้ยืม</label>
+                <input type="text" id="borrower-${computer.id}" value="${computer.borrower || ''}" ${computer.status !== 'borrowed' ? 'disabled' : ''}>
+            </div>
+            <div class="form-group">
+                <label>หมายเหตุ</label>
+                <textarea id="note-${computer.id}" style="min-height: 60px;">${computer.note || ''}</textarea>
+            </div>
+            <button class="btn-save" onclick="saveComputerChanges('${computer.id}')">💾 บันทึก</button>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+window.updateComputerStatus = function(computerId) {
+    const status = document.getElementById(`status-${computerId}`).value;
+    const duedateGroup = document.getElementById(`duedate-group-${computerId}`);
+    const borrowerInput = document.getElementById(`borrower-${computerId}`);
+    
+    if (status === 'borrowed') {
+        duedateGroup.style.display = 'block';
+        borrowerInput.disabled = false;
+    } else {
+        duedateGroup.style.display = 'none';
+        borrowerInput.disabled = true;
+    }
+};
+
+window.saveComputerChanges = async function(computerId) {
+    const status = document.getElementById(`status-${computerId}`).value;
+    const dueDate = document.getElementById(`duedate-${computerId}`).value;
+    const borrower = document.getElementById(`borrower-${computerId}`).value;
+    const note = document.getElementById(`note-${computerId}`).value;
+
+    const computerRef = ref(database, `computers/${computerId}`);
+    
+    try {
+        await update(computerRef, {
+            status: status,
+            dueDate: status === 'borrowed' ? dueDate : null,
+            borrower: status === 'borrowed' ? borrower : null,
+            note: note
+        });
+        
+        alert('✅ บันทึกข้อมูลเรียบร้อยแล้ว');
+    } catch (error) {
+        console.error('Error updating computer:', error);
+        alert('❌ เกิดข้อผิดพลาดในการบันทึก');
+    }
+};
+
+function updateLogsTable() {
+    const tbody = document.getElementById('logs-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: #a0aec0;">ยังไม่มีข้อมูล Log</td></tr>';
+        return;
+    }
+
+    const sortedLogs = [...logs].sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+
+    sortedLogs.forEach((log) => {
+        const tr = document.createElement('tr');
+        
+        const requestDate = new Date(log.requestDate).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        let statusClass = 'status-pending';
+        let statusText = 'รอการอนุมัติ';
+        let actionButtons = '';
+        
+        if (log.status === 'approved') {
+            statusClass = 'status-approved';
+            statusText = 'อนุมัติ';
+        } else if (log.status === 'rejected') {
+            statusClass = 'status-rejected';
+            statusText = 'ไม่อนุมัติ';
+        } else if (log.status === 'pending' && currentUser) {
+            actionButtons = `
+                <button class="btn-save" onclick="approveRequest('${log.logId}')" style="background: #10b981; margin-right: 5px;">✅ อนุมัติ</button>
+                <button class="btn-save" onclick="rejectRequest('${log.logId}')" style="background: #ef4444;">❌ ไม่อนุมัติ</button>
+            `;
+        }
+
+        tr.innerHTML = `
+            <td>${requestDate}</td>
+            <td>${log.borrowerName}</td>
+            <td>${log.computerId}</td>
+            <td>${new Date(log.startDate).toLocaleDateString('th-TH')}</td>
+            <td>${new Date(log.endDate).toLocaleDateString('th-TH')}</td>
+            <td class="${statusClass}">${statusText}</td>
+            <td>${log.approverName || '-'}</td>
+            <td>${log.approvalDate ? new Date(log.approvalDate).toLocaleDateString('th-TH') : '-'}</td>
+            <td>${actionButtons}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// =========================================
+// Form Functions
+// =========================================
+
+window.updateBorrowerTypeField = function() {
     const type = document.getElementById('borrowerType').value;
     const studentIdGroup = document.getElementById('studentIdGroup');
     const departmentGroup = document.getElementById('departmentGroup');
@@ -213,10 +388,9 @@ function updateBorrowerTypeField() {
         studentIdInput.required = false;
         departmentInput.required = false;
     }
-}
+};
 
-// ตรวจสอบวันที่
-function validateDates() {
+window.validateDates = function() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
 
@@ -244,10 +418,9 @@ function validateDates() {
     }
 
     return true;
-}
+};
 
-// ส่งคำขอยืม
-async function submitBooking(event) {
+window.submitBooking = async function(event) {
     event.preventDefault();
 
     if (!validateDates()) {
@@ -263,10 +436,7 @@ async function submitBooking(event) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<div class="spinner"></div> กำลังส่งคำขอ...';
 
-    const requestId = Date.now().toString();
-    
     const formData = {
-        requestId: requestId,
         borrowerName: document.getElementById('borrowerName').value,
         computerId: document.getElementById('computerId').value,
         borrowerType: document.getElementById('borrowerType').value,
@@ -281,90 +451,130 @@ async function submitBooking(event) {
     };
 
     try {
-        // ส่งอีเมลไปยังผู้ยืม
-        await sendEmailToBorrower(formData);
+        // บันทึกลง Firebase
+        await push(logsRef, formData);
         
-        // ส่งอีเมลไปยังผู้อนุมัติ
+        // ส่งอีเมล
+        await sendEmailToBorrower(formData);
         await sendEmailToApprover(formData);
 
-        // เพิ่มลง logs
-        logs.push(formData);
-        saveLogs();
-
-        showAlert('bookingAlert', 'success', '✅ ส่งคำขอยืมคอมพิวเตอร์เรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลยืนยันไปที่ ' + formData.borrowerEmail + ' และอีเมลขออนุมัติไปที่ผู้อนุมัติแล้ว');
+        showAlert('bookingAlert', 'success', '✅ ส่งคำขอยืมคอมพิวเตอร์เรียบร้อยแล้ว! ระบบได้ส่งอีเมลยืนยันไปที่ ' + formData.borrowerEmail);
 
         document.getElementById('bookingForm').reset();
         updateBorrowerTypeField();
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
-        console.error('Error sending email:', error);
-        showAlert('bookingAlert', 'error', '❌ เกิดข้อผิดพลาดในการส่งอีเมล: ' + error.text);
+        console.error('Error submitting booking:', error);
+        showAlert('bookingAlert', 'error', '❌ เกิดข้อผิดพลาด: ' + error.message);
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '✅ ยืนยันส่งคำขอยืมคอมพิวเตอร์';
     }
-}
+};
 
-// ส่งอีเมลไปยังผู้ยืม
+window.approveRequest = async function(logId) {
+    const log = logs.find(l => l.logId === logId);
+    if (!log) return;
+    
+    const logRef = ref(database, `logs/${logId}`);
+    const computerRef = ref(database, `computers/${log.computerId}`);
+    
+    try {
+        await update(logRef, {
+            status: 'approved',
+            approverName: currentUser,
+            approvalDate: new Date().toISOString()
+        });
+        
+        await update(computerRef, {
+            status: 'borrowed',
+            dueDate: log.endDate,
+            borrower: log.borrowerName
+        });
+        
+        await sendApprovalResultEmail({...log, status: 'approved', approverName: currentUser, approvalDate: new Date().toISOString()}, true);
+        
+        alert('✅ อนุมัติคำขอเรียบร้อยแล้ว!');
+    } catch (error) {
+        console.error('Error approving request:', error);
+        alert('❌ เกิดข้อผิดพลาด');
+    }
+};
+
+window.rejectRequest = async function(logId) {
+    const log = logs.find(l => l.logId === logId);
+    if (!log) return;
+    
+    const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี):');
+    
+    const logRef = ref(database, `logs/${logId}`);
+    
+    try {
+        await update(logRef, {
+            status: 'rejected',
+            approverName: currentUser,
+            approvalDate: new Date().toISOString(),
+            rejectionReason: reason || ''
+        });
+        
+        await sendApprovalResultEmail({...log, status: 'rejected', approverName: currentUser, approvalDate: new Date().toISOString(), rejectionReason: reason}, false);
+        
+        alert('❌ ไม่อนุมัติคำขอเรียบร้อยแล้ว!');
+    } catch (error) {
+        console.error('Error rejecting request:', error);
+        alert('❌ เกิดข้อผิดพลาด');
+    }
+};
+
+window.savePermissions = async function() {
+    permissions.approver = document.getElementById('approverEmail').value;
+    permissions.assistantAdmin = document.getElementById('assistantAdminEmail').value;
+    
+    try {
+        await set(permissionsRef, permissions);
+        alert('✅ บันทึกการตั้งค่าสิทธิ์เรียบร้อยแล้ว');
+    } catch (error) {
+        console.error('Error saving permissions:', error);
+        alert('❌ เกิดข้อผิดพลาดในการบันทึก');
+    }
+};
+
+// =========================================
+// Email Functions
+// =========================================
+
 async function sendEmailToBorrower(formData) {
     const htmlContent = `
     <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
-        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
             <h2 style="color: #667eea; text-align: center;">✅ ยืนยันการส่งคำขอยืมคอมพิวเตอร์</h2>
-            
             <p>เรียน คุณ${formData.borrowerName}</p>
-            
             <p>ระบบได้รับคำขอยืมคอมพิวเตอร์ของท่านเรียบร้อยแล้ว</p>
-            
             <div style="background: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #2d3748; margin-top: 0;">📋 รายละเอียดการยืม</h3>
+                <h3>📋 รายละเอียดการยืม</h3>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 8px 0;"><strong>รหัสคอมพิวเตอร์:</strong> ${formData.computerId}</li>
-                    <li style="padding: 8px 0;"><strong>สถานะผู้ยืม:</strong> ${getStatusText(formData.borrowerType)}</li>
-                    <li style="padding: 8px 0;"><strong>รหัสนักศึกษา/สังกัด:</strong> ${formData.studentId || formData.department || '-'}</li>
                     <li style="padding: 8px 0;"><strong>วันที่เริ่มยืม:</strong> ${formatDateThai(formData.startDate)}</li>
                     <li style="padding: 8px 0;"><strong>วันที่คืน:</strong> ${formatDateThai(formData.endDate)}</li>
-                    <li style="padding: 8px 0;"><strong>วัตถุประสงค์:</strong> ${formData.purpose}</li>
                 </ul>
             </div>
-            
-            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
-                <p style="margin: 0;">⏳ <strong>กรุณารอการอนุมัติจากผู้อนุมัติ</strong></p>
-                <p style="margin: 10px 0 0 0; font-size: 14px;">ท่านจะได้รับอีเมลแจ้งผลการพิจารณาอีกครั้ง</p>
-            </div>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
-            
-            <p style="font-size: 14px; color: #718096; text-align: center;">
-                หากมีข้อสงสัยกรุณาติดต่อ<br>
-                นายสุทธิพงศ์ ปริญญาศิริ<br>
-                📧 suttipong.p@psu.ac.th | ☎️ 9608
-            </p>
         </div>
     </div>
     `;
     
-    const templateParams = {
+    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
         to_email: formData.borrowerEmail,
         borrower_name: formData.borrowerName,
         computer_id: formData.computerId,
-        start_date: formatDateThai(formData.startDate),
-        end_date: formatDateThai(formData.endDate),
-        purpose: htmlContent,
-        borrower_type: '',
-        student_id: '',
-        department: ''
-    };
-
-    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, templateParams);
+        purpose: htmlContent
+    });
 }
 
-// ส่งอีเมลไปยังผู้อนุมัติ
 async function sendEmailToApprover(formData) {
     const approvalLink = `${SYSTEM_URL}#approve`;
     
-    const templateParams = {
+    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APPROVER, {
         to_email: permissions.approver,
         borrower_name: formData.borrowerName,
         borrower_email: formData.borrowerEmail,
@@ -376,149 +586,58 @@ async function sendEmailToApprover(formData) {
         student_id: formData.studentId || '-',
         department: formData.department || '-',
         request_date: formatDateTimeThai(formData.requestDate),
-        approval_link: approvalLink,
-        rejection_link: approvalLink
-    };
-
-    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APPROVER, templateParams);
+        approval_link: approvalLink
+    });
 }
 
-// อนุมัติคำขอ
-async function approveRequest(logIndex) {
-    const log = logs[logIndex];
-    
-    log.status = 'approved';
-    log.approverName = currentUser;
-    log.approvalDate = new Date().toISOString();
-    
-    // อัพเดทสถานะคอมพิวเตอร์
-    const computerIndex = computers.findIndex(c => c.id === log.computerId);
-    if (computerIndex !== -1) {
-        computers[computerIndex].status = 'borrowed';
-        computers[computerIndex].dueDate = log.endDate;
-        computers[computerIndex].borrower = log.borrowerName;
-        saveComputers();
-    }
-    
-    saveLogs();
-    
-    // ส่งอีเมลแจ้งผลการอนุมัติ
-    await sendApprovalResultEmail(log, true);
-    
-    alert('✅ อนุมัติคำขอเรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลแจ้งผู้ยืมและผู้ดูแลระบบแล้ว');
-    
-    displayComputers();
-    updateLogsTable();
-}
-
-// ไม่อนุมัติคำขอ
-async function rejectRequest(logIndex) {
-    const log = logs[logIndex];
-    
-    const reason = prompt('กรุณาระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี):');
-    
-    log.status = 'rejected';
-    log.approverName = currentUser;
-    log.approvalDate = new Date().toISOString();
-    log.rejectionReason = reason || '';
-    
-    saveLogs();
-    
-    // ส่งอีเมลแจ้งผลไม่อนุมัติ
-    await sendApprovalResultEmail(log, false);
-    
-    alert('❌ ไม่อนุมัติคำขอเรียบร้อยแล้ว!\n\nระบบได้ส่งอีเมลแจ้งผู้ยืมและผู้ดูแลระบบแล้ว');
-    
-    updateLogsTable();
-}
-
-// ส่งอีเมลแจ้งผลการพิจารณา
 async function sendApprovalResultEmail(log, isApproved) {
-    const status = isApproved ? 'อนุมัติ' : 'ไม่อนุมัติ';
     const statusColor = isApproved ? '#10b981' : '#ef4444';
     const bgColor = isApproved ? '#d1fae5' : '#fee2e2';
     
     const htmlContent = `
     <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f7fafc;">
-        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
             <h2 style="color: ${statusColor}; text-align: center;">
                 ${isApproved ? '✅' : '❌'} ผลการพิจารณาคำขอยืมคอมพิวเตอร์
             </h2>
-            
             <div style="background: ${bgColor}; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p style="font-size: 18px; font-weight: bold; text-align: center; margin: 0;">
-                    คำขอของคุณได้รับการ${status}
+                    คำขอของคุณได้รับการ${isApproved ? 'อนุมัติ' : 'ไม่อนุมัติ'}
                 </p>
             </div>
-            
-            <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #2d3748; margin-top: 0;">📋 รายละเอียดคำขอ</h3>
+            <div style="background: #f0f9ff; padding: 20px; border-radius: 8px;">
+                <h3>📋 รายละเอียดคำขอ</h3>
                 <ul style="list-style: none; padding: 0;">
                     <li style="padding: 8px 0;"><strong>ผู้ยืม:</strong> ${log.borrowerName}</li>
                     <li style="padding: 8px 0;"><strong>รหัสคอมพิวเตอร์:</strong> ${log.computerId}</li>
-                    <li style="padding: 8px 0;"><strong>วันที่เริ่มยืม:</strong> ${formatDateThai(log.startDate)}</li>
-                    <li style="padding: 8px 0;"><strong>วันที่คืน:</strong> ${formatDateThai(log.endDate)}</li>
                     <li style="padding: 8px 0;"><strong>ผู้พิจารณา:</strong> ${log.approverName}</li>
-                    <li style="padding: 8px 0;"><strong>วันที่พิจารณา:</strong> ${formatDateTimeThai(log.approvalDate)}</li>
-                    ${!isApproved && log.rejectionReason ? `<li style="padding: 8px 0;"><strong>เหตุผล:</strong> ${log.rejectionReason}</li>` : ''}
                 </ul>
             </div>
-            
-            ${isApproved ? `
-            <div style="background: #dcfce7; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
-                <p style="margin: 0;"><strong>✅ กรุณามารับคอมพิวเตอร์ตามวันที่กำหนด</strong></p>
-                <p style="margin: 10px 0 0 0;">อย่าลืมนำบัตรประชาชนหรือบัตรนักศึกษามาด้วย</p>
-            </div>
-            ` : `
-            <div style="background: #fef2f2; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444;">
-                <p style="margin: 0;"><strong>❌ คำขอของท่านไม่ได้รับการอนุมัติ</strong></p>
-                <p style="margin: 10px 0 0 0;">หากมีข้อสงสัย กรุณาติดต่อผู้อนุมัติ</p>
-            </div>
-            `}
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
-            
-            <p style="font-size: 14px; color: #718096; text-align: center;">
-                ระบบยืมคืนคอมพิวเตอร์พกพา<br>
-                มหาวิทยาลัยสงขลานครินทร์<br>
-                ติดต่อ: suttipong.p@psu.ac.th | 9608
-            </p>
         </div>
     </div>
     `;
     
     // ส่งให้ผู้ยืม
-    try {
-        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
-            to_email: log.borrowerEmail,
-            borrower_name: log.borrowerName,
-            computer_id: log.computerId,
-            start_date: '',
-            end_date: '',
-            purpose: htmlContent,
-            borrower_type: '',
-            student_id: '',
-            department: ''
-        });
-        
-        // ส่งสำเนาให้ผู้ดูแลระบบ
-        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
-            to_email: permissions.admin,
-            borrower_name: log.borrowerName,
-            computer_id: log.computerId,
-            start_date: '',
-            end_date: '',
-            purpose: htmlContent,
-            borrower_type: '',
-            student_id: '',
-            department: ''
-        });
-    } catch (error) {
-        console.error('Error sending result email:', error);
-    }
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+        to_email: log.borrowerEmail,
+        borrower_name: log.borrowerName,
+        computer_id: log.computerId,
+        purpose: htmlContent
+    });
+    
+    // ส่งสำเนาให้ผู้ดูแลระบบ
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_BORROWER, {
+        to_email: permissions.admin,
+        borrower_name: log.borrowerName,
+        computer_id: log.computerId,
+        purpose: htmlContent
+    });
 }
 
-// แปลงวันที่เป็นภาษาไทย
+// =========================================
+// Utility Functions
+// =========================================
+
 function formatDateThai(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('th-TH', {
@@ -539,7 +658,6 @@ function formatDateTimeThai(dateString) {
     });
 }
 
-// แสดง Alert
 function showAlert(elementId, type, message) {
     const alertDiv = document.getElementById(elementId);
     if (alertDiv) {
@@ -555,167 +673,37 @@ function showAlert(elementId, type, message) {
     }
 }
 
-// แปลงสถานะเป็นข้อความไทย
 function getStatusText(type) {
-    switch(type) {
-        case 'student': return 'นักศึกษา';
-        case 'teacher': return 'อาจารย์';
-        case 'staff': return 'บุคลากร';
-        case 'available': return 'ว่าง';
-        case 'borrowed': return 'ไม่ว่าง';
-        case 'maintenance': return 'ชำรุด/รอซ่อม';
-        case 'pending': return 'รอการอนุมัติ';
-        case 'approved': return 'อนุมัติ';
-        case 'rejected': return 'ไม่อนุมัติ';
-        default: return type;
+    const statusMap = {
+        'student': 'นักศึกษา',
+        'teacher': 'อาจารย์',
+        'staff': 'บุคลากร',
+        'available': 'ว่าง',
+        'borrowed': 'ไม่ว่าง',
+        'maintenance': 'ชำรุด/รอซ่อม',
+        'pending': 'รอการอนุมัติ',
+        'approved': 'อนุมัติ',
+        'rejected': 'ไม่อนุมัติ'
+    };
+    return statusMap[type] || type;
+}
+
+function setMinDates() {
+    const today = new Date();
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() + 3);
+
+    const startDateInput = document.getElementById('startDate');
+    if (startDateInput) {
+        startDateInput.min = minDate.toISOString().split('T')[0];
     }
 }
 
-// อัพเดท Management Grid (หน้าที่ 4)
-function updateManagementGrid() {
-    const grid = document.getElementById('management-grid');
-    if (!grid) return;
-    
-    grid.innerHTML = '';
+// =========================================
+// Navigation Functions
+// =========================================
 
-    computers.forEach((computer, index) => {
-        const card = document.createElement('div');
-        card.className = 'management-card';
-        card.innerHTML = `
-            <h4>💻 ${computer.id}</h4>
-            <div class="inline-form">
-                <div class="form-group">
-                    <label>สถานะ</label>
-                    <select id="status-${index}" onchange="updateComputerStatus(${index})">
-                        <option value="available" ${computer.status === 'available' ? 'selected' : ''}>ว่าง</option>
-                        <option value="borrowed" ${computer.status === 'borrowed' ? 'selected' : ''}>ไม่ว่าง</option>
-                        <option value="maintenance" ${computer.status === 'maintenance' ? 'selected' : ''}>ชำรุด/รอซ่อม</option>
-                    </select>
-                </div>
-                <div class="form-group" id="duedate-group-${index}" style="display: ${computer.status === 'borrowed' ? 'block' : 'none'};">
-                    <label>วันสิ้นสุดการยืม</label>
-                    <input type="date" id="duedate-${index}" value="${computer.dueDate || ''}" onchange="updateComputerDueDate(${index})">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>ชื่อผู้ยืม</label>
-                <input type="text" id="borrower-${index}" value="${computer.borrower || ''}" ${computer.status !== 'borrowed' ? 'disabled' : ''}>
-            </div>
-            <div class="form-group">
-                <label>หมายเหตุ</label>
-                <textarea id="note-${index}" onchange="updateComputerNote(${index})" style="min-height: 60px;">${computer.note || ''}</textarea>
-            </div>
-            <button class="btn-save" onclick="saveComputerChanges(${index})">💾 บันทึก</button>
-        `;
-        grid.appendChild(card);
-    });
-}
-
-// อัพเดทสถานะคอมพิวเตอร์
-function updateComputerStatus(index) {
-    const status = document.getElementById(`status-${index}`).value;
-    const duedateGroup = document.getElementById(`duedate-group-${index}`);
-    const borrowerInput = document.getElementById(`borrower-${index}`);
-    
-    if (status === 'borrowed') {
-        duedateGroup.style.display = 'block';
-        borrowerInput.disabled = false;
-    } else {
-        duedateGroup.style.display = 'none';
-        borrowerInput.disabled = true;
-    }
-}
-
-// อัพเดทวันสิ้นสุดการยืม
-function updateComputerDueDate(index) {
-    // ฟังก์ชันนี้จะถูกเรียกเมื่อมีการเปลี่ยนวันที่
-}
-
-// อัพเดทหมายเหตุ
-function updateComputerNote(index) {
-    // ฟังก์ชันนี้จะถูกเรียกเมื่อมีการเปลี่ยนหมายเหตุ
-}
-
-// บันทึกการเปลี่ยนแปลงคอมพิวเตอร์
-function saveComputerChanges(index) {
-    const status = document.getElementById(`status-${index}`).value;
-    const dueDate = document.getElementById(`duedate-${index}`).value;
-    const borrower = document.getElementById(`borrower-${index}`).value;
-    const note = document.getElementById(`note-${index}`).value;
-
-    computers[index].status = status;
-    computers[index].dueDate = status === 'borrowed' ? dueDate : null;
-    computers[index].borrower = status === 'borrowed' ? borrower : null;
-    computers[index].note = note;
-
-    saveComputers();
-    displayComputers();
-    updateComputerDropdown();
-
-    alert('✅ บันทึกข้อมูลเรียบร้อยแล้ว');
-}
-
-// อัพเดทตาราง Logs (หน้าที่ 5)
-function updateLogsTable() {
-    const tbody = document.getElementById('logs-tbody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-
-    if (logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: #a0aec0;">ยังไม่มีข้อมูล Log</td></tr>';
-        return;
-    }
-
-    const sortedLogs = [...logs].reverse();
-
-    sortedLogs.forEach((log, index) => {
-        const tr = document.createElement('tr');
-        
-        const requestDate = new Date(log.requestDate).toLocaleDateString('th-TH', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        let statusClass = 'status-pending';
-        let statusText = 'รอการอนุมัติ';
-        let actionButtons = '';
-        
-        if (log.status === 'approved') {
-            statusClass = 'status-approved';
-            statusText = 'อนุมัติ';
-        } else if (log.status === 'rejected') {
-            statusClass = 'status-rejected';
-            statusText = 'ไม่อนุมัติ';
-        } else if (log.status === 'pending' && currentUser) {
-            // แสดงปุ่มอนุมัติ/ไม่อนุมัติสำหรับคำขอที่รอพิจารณา
-            const logIndex = logs.length - 1 - index; // หา index จริงใน array
-            actionButtons = `
-                <button class="btn-save" onclick="approveRequest(${logIndex})" style="background: #10b981; margin-right: 5px;">✅ อนุมัติ</button>
-                <button class="btn-save" onclick="rejectRequest(${logIndex})" style="background: #ef4444;">❌ ไม่อนุมัติ</button>
-            `;
-        }
-
-        tr.innerHTML = `
-            <td>${requestDate}</td>
-            <td>${log.borrowerName}</td>
-            <td>${log.computerId}</td>
-            <td>${new Date(log.startDate).toLocaleDateString('th-TH')}</td>
-            <td>${new Date(log.endDate).toLocaleDateString('th-TH')}</td>
-            <td class="${statusClass}">${statusText}</td>
-            <td>${log.approverName || '-'}</td>
-            <td>${log.approvalDate ? new Date(log.approvalDate).toLocaleDateString('th-TH') : '-'}</td>
-            <td>${actionButtons}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-// เปลี่ยนหน้า
-function showPage(pageName) {
+window.showPage = function(pageName) {
     if ((pageName === 'permission' || pageName === 'management' || pageName === 'logs') && !currentUser) {
         showLoginModal();
         return;
@@ -729,30 +717,23 @@ function showPage(pageName) {
     const tabs = document.querySelectorAll('.nav-tab');
     tabs.forEach(tab => tab.classList.remove('active'));
     event.target.classList.add('active');
+};
 
-    if (pageName === 'status') {
-        displayComputers();
-    } else if (pageName === 'booking') {
-        updateComputerDropdown();
-    } else if (pageName === 'management') {
-        updateManagementGrid();
-    } else if (pageName === 'logs') {
-        updateLogsTable();
-    }
-}
+// =========================================
+// Login Functions
+// =========================================
 
-// Login Modal
 function showLoginModal() {
     document.getElementById('loginModal').classList.add('show');
 }
 
-function closeLoginModal() {
+window.closeLoginModal = function() {
     document.getElementById('loginModal').classList.remove('show');
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
-}
+};
 
-function login(event) {
+window.login = function(event) {
     event.preventDefault();
 
     const email = document.getElementById('loginEmail').value;
@@ -769,19 +750,19 @@ function login(event) {
         currentUser = email;
         checkLogin();
         closeLoginModal();
-        updateLogsTable(); // Refresh logs to show action buttons
+        updateLogsTable();
         alert('✅ เข้าสู่ระบบสำเร็จ!');
     } else {
         alert('❌ คุณไม่มีสิทธิ์เข้าถึงหน้านี้');
     }
-}
+};
 
-function logout() {
+window.logout = function() {
     currentUser = null;
     checkLogin();
     showPage('status');
     alert('✅ ออกจากระบบเรียบร้อยแล้ว');
-}
+};
 
 function checkLogin() {
     const tabPermission = document.getElementById('tabPermission');
@@ -803,20 +784,10 @@ function checkLogin() {
     }
 }
 
-// ตั้งค่าวันที่ขั้นต่ำ
-function setMinDates() {
-    const today = new Date();
-    const minDate = new Date(today);
-    minDate.setDate(minDate.getDate() + 3);
+// =========================================
+// Initialize on Page Load
+// =========================================
 
-    const startDateInput = document.getElementById('startDate');
-    if (startDateInput) {
-        startDateInput.min = minDate.toISOString().split('T')[0];
-    }
-}
-
-// เริ่มต้นระบบเมื่อโหลดหน้า
 document.addEventListener('DOMContentLoaded', function() {
     initializeSystem();
-    setMinDates();
 });
